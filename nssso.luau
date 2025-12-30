@@ -1,27 +1,3 @@
-[file name]: image.png
-[file content begin]
-# femboy.sense
-
-- **silent ain**
-  - enabled NOVEL bind
-  - hitchance    Label
-    target
-    hitbox
-  - visibility check
-  - team check
-    machine
-  - enabled
-    from
-
-- **favorircle**
-  - enabled ❤️
-  - outline ❤️
-  ↓    Label
-    reset
-
-
-[file content end]
-
 -- Variables 
     local uis = game:GetService("UserInputService") 
     local players = game:GetService("Players") 
