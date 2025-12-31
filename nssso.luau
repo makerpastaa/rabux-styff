@@ -69,7 +69,13 @@
         config_flags = {},
         connections = {},   
         notifications = {notifs = {}},
-        current_open; 
+        current_open,
+        -- Добавляем переменные для снежного фона
+        snow_particles = {},
+        snow_enabled = false,
+        snow_connections = {},
+        menu_background = nil,
+        menu_open = false
     }
 
     local keys = {
@@ -436,10 +442,154 @@
                 ins[prop] = value
             end
             
-            return ins 
+            return ins
+        end
+
+        -- Функция для создания снежного фона
+        function library:create_snow_background()
+            -- Создаем ScreenGui для снежного фона
+            library.menu_background = library:create("ScreenGui", {
+                Parent = coregui,
+                Name = "SnowBackground",
+                DisplayOrder = 99999998,
+                ResetOnSpawn = false,
+                IgnoreGuiInset = true
+            })
+
+            -- Затемненный фон
+            local dark_overlay = library:create("Frame", {
+                Parent = library.menu_background,
+                Name = "DarkOverlay",
+                BackgroundColor3 = rgb(0, 0, 0),
+                BackgroundTransparency = 0.7,
+                BorderSizePixel = 0,
+                Size = dim2(1, 0, 1, 0),
+                Visible = false
+            })
+
+            -- Фрейм для частиц снега
+            local snow_frame = library:create("Frame", {
+                Parent = library.menu_background,
+                Name = "SnowFrame",
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Size = dim2(1, 0, 1, 0),
+                Visible = false
+            })
+
+            return dark_overlay, snow_frame
+        end
+
+        -- Функция для создания снежинки
+        function library:create_snowflake(parent)
+            local snowflake = library:create("ImageLabel", {
+                Parent = parent,
+                BackgroundTransparency = 1,
+                Size = dim2(0, 24, 0, 24),
+                Image = "rbxassetid://135724655",
+                ImageColor3 = rgb(255, 255, 255),
+                AnchorPoint = vec2(0.5, 0.5),
+                Position = dim2(0, random(0, camera.ViewportSize.X), 0, -50),
+                ZIndex = 99999997
+            })
+
+            insert(library.snow_particles, snowflake)
+            return snowflake
+        end
+
+        -- Функция для обновления снежинок
+        function library:update_snow()
+            if not library.snow_enabled then return end
+
+            for i = #library.snow_particles, 1, -1 do
+                local snowflake = library.snow_particles[i]
+                
+                if snowflake and snowflake.Parent then
+                    local current_pos = snowflake.Position
+                    local new_y = current_pos.Y.Offset + 1.5 -- Скорость падения
+                    
+                    -- Случайное смещение по X для эффекта покачивания
+                    local wave_offset = sin(tick() * 2 + i) * 0.5
+                    local new_x = current_pos.X.Offset + wave_offset
+                    
+                    -- Медленное вращение
+                    local rotation = snowflake.Rotation + 0.3
+                    if rotation > 360 then rotation = 0 end
+                    
+                    snowflake.Position = dim2(0, new_x, 0, new_y)
+                    snowflake.Rotation = rotation
+                    
+                    -- Плавное изменение прозрачности
+                    local transparency = 0.2 + (sin(tick() * 1.5 + i) + 1) / 2 * 0.6
+                    snowflake.ImageTransparency = transparency
+                    
+                    -- Если снежинка упала за пределы экрана, перемещаем ее наверх
+                    if new_y > camera.ViewportSize.Y + 50 then
+                        snowflake.Position = dim2(0, random(0, camera.ViewportSize.X), 0, -50)
+                    end
+                else
+                    remove(library.snow_particles, i)
+                end
+            end
+        end
+
+        -- Функция для включения/выключения снежного фона
+        function library:toggle_snow_background(enabled)
+            library.snow_enabled = enabled
+            
+            if enabled then
+                -- Создаем фон если еще не создан
+                if not library.menu_background then
+                    local dark_overlay, snow_frame = library:create_snow_background()
+                    library.menu_background_dark = dark_overlay
+                    library.menu_background_snow = snow_frame
+                end
+                
+                -- Показываем фон
+                library.menu_background_dark.Visible = true
+                library.menu_background_snow.Visible = true
+                
+                -- Создаем начальные снежинки
+                for i = 1, 50 do
+                    library:create_snowflake(library.menu_background_snow)
+                end
+                
+                -- Запускаем обновление снега
+                local snow_connection = run.RenderStepped:Connect(function()
+                    library:update_snow()
+                end)
+                
+                insert(library.snow_connections, snow_connection)
+            else
+                -- Скрываем фон
+                if library.menu_background_dark then
+                    library.menu_background_dark.Visible = false
+                end
+                if library.menu_background_snow then
+                    library.menu_background_snow.Visible = false
+                end
+                
+                -- Очищаем снежинки
+                for i = #library.snow_particles, 1, -1 do
+                    local snowflake = library.snow_particles[i]
+                    if snowflake then
+                        snowflake:Destroy()
+                    end
+                    remove(library.snow_particles, i)
+                end
+                
+                -- Отключаем соединения
+                for _, connection in ipairs(library.snow_connections) do
+                    connection:Disconnect()
+                end
+                library.snow_connections = {}
+            end
         end
 
         function library:unload_menu() 
+            -- Очищаем снежный фон
+            library:toggle_snow_background(false)
+            
             if library[ "items" ] then 
                 library[ "items" ]:Destroy()
             end
@@ -447,6 +597,11 @@
             if library[ "other" ] then 
                 library[ "other" ]:Destroy()
             end 
+            
+            -- Удаляем снежный фон
+            if library.menu_background then
+                library.menu_background:Destroy()
+            end
             
             for index, connection in library.connections do 
                 connection:Disconnect() 
@@ -587,6 +742,10 @@
                 end 
 
                 cfg.tweening = true 
+                library.menu_open = bool
+                
+                -- Включаем/выключаем снежный фон при открытии/закрытии меню
+                library:toggle_snow_background(bool)
 
                 if bool then 
                     items[ "window" ].Visible = true
@@ -877,7 +1036,7 @@
                 });                
 
                 library:create( "UIStroke" , {
-                    Parent = items.text;
+                    Parent = items.text,
                 });
                 
                 library:create( "UICorner" , {
