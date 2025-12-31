@@ -447,13 +447,14 @@
 
         -- Функция для создания снежного фона
         function library:create_snow_background()
-            -- Создаем ScreenGui для снежного фона
+            -- Создаем ScreenGui для снежного фона с низким ZIndexBehavior
             library.menu_background = library:create("ScreenGui", {
                 Parent = coregui,
                 Name = "SnowBackground",
-                DisplayOrder = 99999998,
+                DisplayOrder = 0,  -- Самый низкий приоритет
                 ResetOnSpawn = false,
-                IgnoreGuiInset = true
+                IgnoreGuiInset = true,
+                ZIndexBehavior = Enum.ZIndexBehavior.Sibling
             })
 
             -- Затемненный фон
@@ -464,6 +465,7 @@
                 BackgroundTransparency = 0.7,
                 BorderSizePixel = 0,
                 Size = dim2(1, 0, 1, 0),
+                ZIndex = 0,  -- Самый низкий z-index
                 Visible = false
             })
 
@@ -474,62 +476,118 @@
                 BackgroundTransparency = 1,
                 BorderSizePixel = 0,
                 Size = dim2(1, 0, 1, 0),
+                ZIndex = 1,  -- Немного выше фона, но ниже UI
                 Visible = false
             })
 
             return dark_overlay, snow_frame
         end
 
-        -- Функция для создания снежинки
+        -- Функция для создания снежинки с разнообразными параметрами
         function library:create_snowflake(parent)
+            -- Разные размеры снежинок
+            local sizes = {12, 16, 20, 24, 28}
+            local size = sizes[random(1, #sizes)]
+            
+            -- Разная начальная прозрачность
+            local start_transparency = random(20, 60) / 100
+            
+            -- Разная начальная позиция по X (по всему экрану)
+            local start_x = random(-50, camera.ViewportSize.X + 50)
+            
+            -- Разная начальная позиция по Y (не только сверху, но и случайно по высоте)
+            local start_y = random(-100, -50)
+            
+            -- Разная начальная скорость падения
+            local fall_speed = random(10, 25) / 10
+            
+            -- Разная скорость вращения
+            local rotation_speed = random(5, 15) / 10
+            
+            -- Разная амплитуда покачивания
+            local wave_amplitude = random(5, 15) / 10
+            local wave_frequency = random(5, 15) / 10
+            
             local snowflake = library:create("ImageLabel", {
                 Parent = parent,
                 BackgroundTransparency = 1,
-                Size = dim2(0, 24, 0, 24),
+                Size = dim2(0, size, 0, size),
                 Image = "rbxassetid://135724655",
                 ImageColor3 = rgb(255, 255, 255),
+                ImageTransparency = start_transparency,
                 AnchorPoint = vec2(0.5, 0.5),
-                Position = dim2(0, random(0, camera.ViewportSize.X), 0, -50),
-                ZIndex = 99999997
+                Position = dim2(0, start_x, 0, start_y),
+                ZIndex = 2,  -- Выше фона, но ниже UI элементов
+                Rotation = random(0, 360)
             })
 
-            insert(library.snow_particles, snowflake)
-            return snowflake
+            -- Сохраняем параметры снежинки
+            local snowflake_data = {
+                instance = snowflake,
+                size = size,
+                fall_speed = fall_speed,
+                rotation_speed = rotation_speed,
+                wave_amplitude = wave_amplitude,
+                wave_frequency = wave_frequency,
+                wave_offset = random() * 100,  -- Случайное смещение для волны
+                creation_time = tick()
+            }
+            
+            insert(library.snow_particles, snowflake_data)
+            return snowflake_data
         end
 
         -- Функция для обновления снежинок
         function library:update_snow()
             if not library.snow_enabled then return end
 
+            local current_time = tick()
+            
             for i = #library.snow_particles, 1, -1 do
-                local snowflake = library.snow_particles[i]
+                local snowflake_data = library.snow_particles[i]
+                local snowflake = snowflake_data.instance
                 
                 if snowflake and snowflake.Parent then
                     local current_pos = snowflake.Position
-                    local new_y = current_pos.Y.Offset + 1.5 -- Скорость падения
+                    local time_since_creation = current_time - snowflake_data.creation_time
                     
-                    -- Случайное смещение по X для эффекта покачивания
-                    local wave_offset = sin(tick() * 2 + i) * 0.5
+                    -- Падение вниз с индивидуальной скоростью
+                    local new_y = current_pos.Y.Offset + snowflake_data.fall_speed
+                    
+                    -- Покачивание из стороны в сторону
+                    local wave_offset = sin(time_since_creation * snowflake_data.wave_frequency + snowflake_data.wave_offset) * snowflake_data.wave_amplitude
                     local new_x = current_pos.X.Offset + wave_offset
                     
-                    -- Медленное вращение
-                    local rotation = snowflake.Rotation + 0.3
-                    if rotation > 360 then rotation = 0 end
+                    -- Вращение с индивидуальной скоростью
+                    local rotation = snowflake.Rotation + snowflake_data.rotation_speed
+                    if rotation > 360 then rotation = rotation - 360 end
+                    
+                    -- Плавное изменение прозрачности (пульсация)
+                    local transparency = 0.3 + (sin(time_since_creation * 1.5 + snowflake_data.wave_offset) + 1) / 2 * 0.4
                     
                     snowflake.Position = dim2(0, new_x, 0, new_y)
                     snowflake.Rotation = rotation
-                    
-                    -- Плавное изменение прозрачности
-                    local transparency = 0.2 + (sin(tick() * 1.5 + i) + 1) / 2 * 0.6
                     snowflake.ImageTransparency = transparency
                     
-                    -- Если снежинка упала за пределы экрана, перемещаем ее наверх
-                    if new_y > camera.ViewportSize.Y + 50 then
-                        snowflake.Position = dim2(0, random(0, camera.ViewportSize.X), 0, -50)
+                    -- Если снежинка упала за пределы экрана, перемещаем ее наверх в случайное место
+                    if new_y > camera.ViewportSize.Y + 100 then
+                        snowflake.Position = dim2(0, random(-50, camera.ViewportSize.X + 50), 0, random(-100, -50))
+                        snowflake_data.creation_time = current_time
+                        snowflake_data.wave_offset = random() * 100
+                    end
+                    
+                    -- Если снежинка вышла слишком далеко в стороны, возвращаем ее
+                    if new_x < -100 or new_x > camera.ViewportSize.X + 100 then
+                        snowflake.Position = dim2(0, clamp(new_x, -50, camera.ViewportSize.X + 50), 0, new_y)
                     end
                 else
                     remove(library.snow_particles, i)
                 end
+            end
+            
+            -- Периодически добавляем новые снежинки
+            if random() < 0.3 then  -- 30% шанс добавить снежинку каждый кадр
+                library:create_snowflake(library.menu_background_snow)
             end
         end
 
@@ -549,7 +607,7 @@
                 library.menu_background_dark.Visible = true
                 library.menu_background_snow.Visible = true
                 
-                -- Создаем начальные снежинки
+                -- Создаем начальные снежинки в случайных местах
                 for i = 1, 50 do
                     library:create_snowflake(library.menu_background_snow)
                 end
@@ -571,9 +629,9 @@
                 
                 -- Очищаем снежинки
                 for i = #library.snow_particles, 1, -1 do
-                    local snowflake = library.snow_particles[i]
-                    if snowflake then
-                        snowflake:Destroy()
+                    local snowflake_data = library.snow_particles[i]
+                    if snowflake_data and snowflake_data.instance then
+                        snowflake_data.instance:Destroy()
                     end
                     remove(library.snow_particles, i)
                 end
@@ -631,6 +689,7 @@
                 Enabled = true;
                 ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
                 IgnoreGuiInset = true;
+                DisplayOrder = 99999999,  -- Высокий приоритет для UI
             });
             
             library[ "other" ] = library:create( "ScreenGui" , {
@@ -639,6 +698,7 @@
                 Enabled = false;
                 ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
                 IgnoreGuiInset = true;
+                DisplayOrder = 99999998,  -- Чуть ниже основного UI
             }); 
 
             local items = cfg.items; do
@@ -650,7 +710,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = cfg.size;
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 100  -- Высокий z-index для элементов меню
                 }); items[ "window" ].Position = dim2(0, items[ "window" ].AbsolutePosition.X, 0, items[ "window" ].AbsolutePosition.Y)          
 
                 items[ "top_frame" ] = library:create( "Frame" , {
@@ -659,7 +720,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, 0, 0, 45);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 101
                 });
                 
                 items[ "logo" ] = library:create( "ImageLabel" , {
@@ -671,7 +733,8 @@
                     Position = dim2(0, 16, 0, 7);
                     Size = dim2(0, 32, 0, 32);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 102
                 });
                 
                 items[ "ui_title" ] = library:create( "TextLabel" , {
@@ -686,7 +749,8 @@
                     BorderSizePixel = 0;
                     BorderColor3 = rgb(0, 0, 0);
                     TextSize = 35;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 102
                 });
                 
                 items[ "inline" ] = library:create( "Frame" , {
@@ -696,7 +760,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(0, 63, 1, -44);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 101
                 });
                 
                 items[ "tab_button_holder" ] = library:create( "Frame" , {
@@ -706,7 +771,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(14, 14, 14)
+                    BackgroundColor3 = rgb(14, 14, 14),
+                    ZIndex = 102
                 });
                 
                 library:create( "UIPadding" , {
@@ -727,7 +793,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -63, 1, -45);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(12, 12, 12)
+                    BackgroundColor3 = rgb(12, 12, 12),
+                    ZIndex = 101
                 });                
             end 
 
@@ -799,7 +866,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.Y;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 103
                     });
                     
                     items[ "image" ] = library:create( "ImageLabel" , {
@@ -815,7 +883,8 @@
                         Position = dim2(0.5, 0, 0, 0);
                         Selectable = true;
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 104
                     });                       
                 -- 
 
@@ -828,7 +897,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, 0, 1, 0);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 100
                     });
                     
                     library:create( "UIListLayout" , {
@@ -856,7 +926,8 @@
                             BorderColor3 = rgb(0, 0, 0);
                             Size = dim2(0, 100, 0, 100);
                             BorderSizePixel = 0;
-                            BackgroundColor3 = rgb(8, 8, 8)
+                            BackgroundColor3 = rgb(8, 8, 8),
+                            ZIndex = 101
                         }); 
                     end                  
                 -- 
@@ -913,7 +984,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, 0, 1, 0);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(8, 8, 8)
+                    BackgroundColor3 = rgb(8, 8, 8),
+                    ZIndex = 102
                 });
                 
                 items[ "section_shadow" ] = library:create( "Frame" , {
@@ -924,7 +996,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(5, 5, 5)
+                    BackgroundColor3 = rgb(5, 5, 5),
+                    ZIndex = 103
                 });
                 
                 items[ "section_shadow_one" ] = library:create( "Frame" , {
@@ -935,7 +1008,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 104
                 });
                 
                 items[ "section_shadow_two" ] = library:create( "Frame" , {
@@ -946,7 +1020,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 105
                 });
                 
                 items[ "section_shadow_three" ] = library:create( "Frame" , {
@@ -956,7 +1031,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, 0, 1, 0);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(14, 14, 14)
+                    BackgroundColor3 = rgb(14, 14, 14),
+                    ZIndex = 106
                 });
                 
                 library:create( "UICorner" , {
@@ -976,7 +1052,8 @@
                     BackgroundColor3 = rgb(255, 255, 255);
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
-                    CanvasSize = dim2(0, 0, 0, 0)
+                    CanvasSize = dim2(0, 0, 0, 0),
+                    ZIndex = 107
                 });
                 
                 items[ "elements" ] = library:create( "Frame" , {
@@ -988,7 +1065,8 @@
                     Size = dim2(1, -24, 0, 0);
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.Y;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 108
                 });
                 
                 library:create( "UIListLayout" , {
@@ -1023,7 +1101,8 @@
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
                     TextSize = 10;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
                 
                 items.line = library:create( "Frame" , {
@@ -1032,7 +1111,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(0, 0, 0, 1);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 110
                 });                
 
                 library:create( "UIStroke" , {
@@ -1100,7 +1180,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
                     -- AutomaticSize = Enum.AutomaticSize.Y;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
                 
                 items[ "toggle_outline" ] = library:create( "Frame" , {
@@ -1110,7 +1191,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(0, 12, 0, 12);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 110
                 });
                 
                 items[ "toggle_shading" ] = library:create( "Frame" , {
@@ -1121,7 +1203,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(92, 92, 92)
+                    BackgroundColor3 = rgb(92, 92, 92),
+                    ZIndex = 111
                 });
                 
                 items[ "toggle_inline" ] = library:create( "Frame" , {
@@ -1131,7 +1214,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(54, 54, 54)
+                    BackgroundColor3 = rgb(54, 54, 54),
+                    ZIndex = 112
                 });
                 
                 library:create( "UIListLayout" , {
@@ -1152,7 +1236,8 @@
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
                     TextSize = 10;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 110
                 });
                 
                 library:create( "UIStroke" , {
@@ -1218,7 +1303,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
                 
                 library:create( "UIListLayout" , {
@@ -1236,7 +1322,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(0, 100, 1, 0);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 110
                 });
                 
                 items[ "slider_holder" ] = library:create( "Frame" , {
@@ -1247,7 +1334,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, 0, 0, 5);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 111
                 });
                 
                 items[ "gradient_holder" ] = library:create( "Frame" , {
@@ -1257,7 +1345,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 112
                 });
                 
                 library:create( "UIGradient" , {
@@ -1273,7 +1362,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(0, 4, 0, 9);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 113
                 });
                 
                 items[ "inline" ] = library:create( "Frame" , {
@@ -1283,7 +1373,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 114
                 });
                 
                 if cfg.name then
@@ -1363,7 +1454,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.XY;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 109
                     });
 
                     if self.items.object then 
@@ -1381,7 +1473,8 @@
                         Size = dim2(0, 0, 0, 16);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.X;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 110
                     });
                     
                     items[ "dropdown_shading" ] = library:create( "Frame" , {
@@ -1392,7 +1485,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.X;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 111
                     });
                     
                     library:create( "UIGradient" , {
@@ -1414,7 +1508,8 @@
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.XY;
                         TextSize = 10;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 112
                     });
                     
                     library:create( "UIStroke" , {
@@ -1447,7 +1542,8 @@
                         Position = dim2(1, -4, 0.5, 0);
                         Size = dim2(0, 7, 0, 4);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 113
                     });
                     
                     library:create( "UIListLayout" , {
@@ -1468,7 +1564,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.Y;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 999  -- Очень высокий z-index для выпадающего списка
                     });
                     
                     items[ "dropdown_shading" ] = library:create( "Frame" , {
@@ -1479,7 +1576,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.Y;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1000
                     });
                     
                     library:create( "UIGradient" , {
@@ -1515,7 +1613,8 @@
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
                     TextSize = 10;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 1001
                 });
                 
                 library:create( "UIStroke" , {
@@ -1641,7 +1740,8 @@
                     Size = dim2(1, 0, 0, 12);
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
 
                 items.text = library:create( "TextLabel" , {
@@ -1656,7 +1756,8 @@
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
                     TextSize = 10;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 110
                 });
 
                 library:create( "UIListLayout" , {
@@ -1719,7 +1820,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(0, 12, 0, 12);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 110
                     });
                     
                     items[ "gear" ] = library:create( "ImageLabel" , {
@@ -1731,7 +1833,8 @@
                         Name = "\0";
                         Size = dim2(0, 12, 0, 12);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 111
                     });
                     
                     library:create( "UIPadding" , {
@@ -1747,7 +1850,7 @@
                         Size = dim2(0, 161, 0, 180);
                         Name = "\0";
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 100;
+                        ZIndex = 999,
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(0, 0, 0)
                     });
@@ -1766,7 +1869,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Position = dim2(0, 1, 0, 1);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(32, 32, 32)
+                        BackgroundColor3 = rgb(32, 32, 32),
+                        ZIndex = 1000
                     });
                     
                     items[ "_" ] = library:create( "UICorner" , {
@@ -1783,7 +1887,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Position = dim2(0, 1, 0, 1);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(8, 8, 8)
+                        BackgroundColor3 = rgb(8, 8, 8),
+                        ZIndex = 1001
                     });
                     
                     items[ "_" ] = library:create( "UICorner" , {
@@ -1809,7 +1914,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, -12, 1, -12);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 1002
                     });
                     
                     items[ "color_saturation" ] = library:create( "Frame" , {
@@ -1819,7 +1925,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, -2, 1, -2);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 39, 39)
+                        BackgroundColor3 = rgb(255, 39, 39),
+                        ZIndex = 1003
                     });
                     
                     items[ "sat" ] = library:create( "Frame" , {
@@ -1827,7 +1934,7 @@
                         Name = "\0";
                         Size = dim2(1, 0, 1, 0);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 2;
+                        ZIndex = 1004;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(255, 255, 255)
                     });
@@ -1845,7 +1952,7 @@
                         Name = "\0";
                         Position = dim2(0, 1, 0.5, 1);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 4;
+                        ZIndex = 1005;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(0, 0, 0)
                     });
@@ -1856,7 +1963,7 @@
                         Name = "\0";
                         Position = dim2(0, 1, 0, 1);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 2;
+                        ZIndex = 1004;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(255, 255, 255)
                     });
@@ -1867,7 +1974,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, 0, 1, 0);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1004
                     });
                     
                     library:create( "UIGradient" , {
@@ -1884,7 +1992,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(0, 10, 1, -12);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 1002
                     });
                     
                     items[ "hue_components" ] = library:create( "Frame" , {
@@ -1894,7 +2003,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, -2, 1, -2);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1003
                     });
                     
                     items[ "_" ] = library:create( "UIGradient" , {
@@ -1910,7 +2020,7 @@
                         Name = "\0";
                         Position = dim2(0, -1, 0, -1);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 4;
+                        ZIndex = 1005;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(0, 0, 0)
                     });
@@ -1921,7 +2031,7 @@
                         Name = "\0";
                         Position = dim2(0, 1, 0, 1);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 2;
+                        ZIndex = 1004;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(255, 255, 255)
                     });
@@ -1935,7 +2045,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, -12, 0, 10);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 1002
                     });
                     
                     items[ "alpha_components" ] = library:create( "Frame" , {
@@ -1945,7 +2056,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, -2, 1, -2);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1003
                     });
                     
                     items[ "_" ] = library:create( "UIGradient" , {
@@ -1960,7 +2072,7 @@
                         Name = "\0";
                         Position = dim2(0, -1, 0, -1);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 4;
+                        ZIndex = 1005;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(0, 0, 0)
                     });
@@ -1971,7 +2083,7 @@
                         Name = "\0";
                         Position = dim2(0, 1, 0, 1);
                         BorderColor3 = rgb(0, 0, 0);
-                        ZIndex = 2;
+                        ZIndex = 1004;
                         BorderSizePixel = 0;
                         BackgroundColor3 = rgb(255, 255, 255)
                     });
@@ -1984,7 +2096,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(0, 10, 0, 10);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 1002
                     });
                     
                     items[ "visualizer" ] = library:create( "Frame" , {
@@ -1994,7 +2107,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         Size = dim2(1, -2, 1, -2);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(123, 83, 255)
+                        BackgroundColor3 = rgb(123, 83, 255),
+                        ZIndex = 1003
                     });
                     
                     items[ "alpha_visualizer" ] = library:create( "ImageLabel" , {
@@ -2009,7 +2123,8 @@
                         
                         TileSize = dim2(0, 2, 0, 2);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1004
                     });
                     
                     items[ "gear" ] = library:create( "ImageButton" , {
@@ -2024,7 +2139,8 @@
                         
                         Size = dim2(0, 12, 0, 12);
                         BorderSizePixel = 0;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1006
                     });
                     
                     library:create( "TextLabel" , {
@@ -2038,7 +2154,8 @@
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.XY;
                         TextSize = 10;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1006
                     });
                     
                     library:create( "UIStroke" , {
@@ -2172,7 +2289,8 @@
                     Size = dim2(1, 0, 0, 16);
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.Y;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
                 
                 items[ "textbox_outline" ] = library:create( "Frame" , {
@@ -2181,7 +2299,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, 0, 0, 20);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 110
                 });
                 
                 items[ "textbox_shading" ] = library:create( "Frame" , {
@@ -2191,7 +2310,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 111
                 });
                 
                 items[ "textbox" ] = library:create( "TextBox" , {
@@ -2212,7 +2332,8 @@
                     BorderSizePixel = 0;
                     TextWrapped = true;
                     AutomaticSize = Enum.AutomaticSize.XY;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 112
                 });
                 
                 library:create( "UIPadding" , {
@@ -2305,7 +2426,8 @@
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.XY;
                         TextSize = 10;
-                        BackgroundColor3 = rgb(38, 38, 38)
+                        BackgroundColor3 = rgb(38, 38, 38),
+                        ZIndex = 110
                     });
 
                     library:create( "UIStroke" , {
@@ -2332,7 +2454,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.Y;
-                        BackgroundColor3 = rgb(0, 0, 0)
+                        BackgroundColor3 = rgb(0, 0, 0),
+                        ZIndex = 999
                     });
                     
                     items[ "mode_shading" ] = library:create( "Frame" , {
@@ -2343,7 +2466,8 @@
                         BorderColor3 = rgb(0, 0, 0);
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.XY;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 1000
                     });
                     
                     library:create( "UIGradient" , {
@@ -2385,7 +2509,8 @@
                             BorderSizePixel = 0;
                             AutomaticSize = Enum.AutomaticSize.XY;
                             TextSize = 10;
-                            BackgroundColor3 = rgb(255, 255, 255)
+                            BackgroundColor3 = rgb(255, 255, 255),
+                            ZIndex = 1001
                         }); cfg.hold_instances[option] = name
                         
                         library:create( "UIStroke" , {
@@ -2573,7 +2698,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.Y;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
                 
                 items[ "button_outline" ] = library:create( "Frame" , {
@@ -2582,7 +2708,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, 0, 0, 20);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(0, 0, 0)
+                    BackgroundColor3 = rgb(0, 0, 0),
+                    ZIndex = 110
                 });
                 
                 items[ "button_shading" ] = library:create( "Frame" , {
@@ -2592,7 +2719,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     Size = dim2(1, -2, 1, -2);
                     BorderSizePixel = 0;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 111
                 });
                 
                 library:create( "UIGradient" , {
@@ -2613,7 +2741,8 @@
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
                     TextSize = 10;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 112
                 });
                 
                 library:create( "UIStroke" , {
@@ -2656,7 +2785,8 @@
                     BorderColor3 = rgb(0, 0, 0);
                     BorderSizePixel = 0;
                     AutomaticSize = Enum.AutomaticSize.XY;
-                    BackgroundColor3 = rgb(255, 255, 255)
+                    BackgroundColor3 = rgb(255, 255, 255),
+                    ZIndex = 109
                 });
                 
                 library:create( "UIListLayout" , {
@@ -2691,7 +2821,8 @@
                         Size = dim2(1, 0, 0, 30);
                         BorderSizePixel = 0;
                         TextSize = 14;
-                        BackgroundColor3 = rgb(33, 33, 35)
+                        BackgroundColor3 = rgb(33, 33, 35),
+                        ZIndex = 110
                     }); cfg.data_store[#cfg.data_store + 1] = button;
 
                     local name = library:create( "TextLabel" , {
@@ -2706,7 +2837,8 @@
                         BorderSizePixel = 0;
                         AutomaticSize = Enum.AutomaticSize.XY;
                         TextSize = 14;
-                        BackgroundColor3 = rgb(255, 255, 255)
+                        BackgroundColor3 = rgb(255, 255, 255),
+                        ZIndex = 111
                     });
                     
                     library:create( "UICorner" , {
@@ -2808,7 +2940,8 @@
 					AutoButtonColor = false;
 					Text = "";
 					AutomaticSize = Enum.AutomaticSize.XY;
-					BackgroundColor3 = rgb(46, 46, 46)
+					BackgroundColor3 = rgb(46, 46, 46),
+					ZIndex = 999
 				});
 
 				local inline = library:create("Frame", {
@@ -2817,7 +2950,8 @@
 					BorderColor3 = rgb(0, 0, 0);
 					BorderSizePixel = 0;
 					AutomaticSize = Enum.AutomaticSize.XY;
-					BackgroundColor3 = rgb(21, 21, 21)
+					BackgroundColor3 = rgb(21, 21, 21),
+					ZIndex = 1000
 				});	
 				
 				local uigradient = library:create("UIGradient", {
@@ -2847,7 +2981,7 @@
 					BackgroundTransparency = 1;
 					TextXAlignment = Enum.TextXAlignment.Left;
 					BorderSizePixel = 0;
-					ZIndex = 2;
+					ZIndex = 1001;
 					TextSize = 10;
 					BackgroundColor3 = rgb(255, 255, 255)
 				});
@@ -2865,7 +2999,8 @@
 					BorderColor3 = rgb(0, 0, 0);
 					Size = dim2(0, 0, 0, 1);
 					BorderSizePixel = 0;
-					BackgroundColor3 = cfg.color
+					BackgroundColor3 = cfg.color,
+					ZIndex = 1001
 				});
 				
 				local accent = library:create( "Frame" , {
@@ -2875,7 +3010,8 @@
 					BorderColor3 = rgb(0, 0, 0);
 					Size = dim2(0, 1, 1, -1);
 					BorderSizePixel = 0;
-					BackgroundColor3 = cfg.color
+					BackgroundColor3 = cfg.color,
+					ZIndex = 1001
 				});
 			-- 
 			
