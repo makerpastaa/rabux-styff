@@ -60,7 +60,7 @@ local concat = table.concat
 
 -- Library init
 getgenv().library = {
-    directory = "monolithhh",
+    directory = "femboy sense",
     folders = {
         "/fonts",
         "/configs",
@@ -79,10 +79,10 @@ getgenv().library = {
     menu_background_snow = nil,
     menu_open = false,
     snow_settings = {
-        max_snowflakes = 15,  -- Немного увеличил для лучшего эффекта
-        spawn_chance = 0.08,   -- Шанс появления новой снежинки
-        speed_min = 8,         -- Минимальная скорость падения
-        speed_max = 18,        -- Максимальная скорость падения
+        max_snowflakes = 15, 
+        spawn_chance = 1,   
+        speed_min = 8,        
+        speed_max = 18,
     }
 }
 
