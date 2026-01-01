@@ -162,7 +162,6 @@ if not isfile(library.directory .. "/fonts/main_encoded.ttf") then
 end 
 
 library.font = Font.new(getcustomasset(library.directory .. "/fonts/main_encoded.ttf"), Enum.FontWeight.Regular)
--- library.font = library.font
 -- 
 
 -- Library functions 
@@ -474,7 +473,7 @@ function library:window(properties)
         Enabled = true;
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
         IgnoreGuiInset = true;
-        DisplayOrder = 99999999,  -- Высокий приоритет для UI
+        DisplayOrder = 99999999,
     });
     
     library[ "other" ] = library:create( "ScreenGui" , {
@@ -483,7 +482,7 @@ function library:window(properties)
         Enabled = false;
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
         IgnoreGuiInset = true;
-        DisplayOrder = 99999998,  -- Чуть ниже основного UI
+        DisplayOrder = 99999998,
     }); 
 
     local items = cfg.items; do
@@ -496,7 +495,7 @@ function library:window(properties)
             Size = cfg.size;
             BorderSizePixel = 0;
             BackgroundColor3 = rgb(0, 0, 0),
-            ZIndex = 100  -- Высокий z-index для элементов меню
+            ZIndex = 100
         }); items[ "window" ].Position = dim2(0, items[ "window" ].AbsolutePosition.X, 0, items[ "window" ].AbsolutePosition.Y)          
 
         items[ "top_frame" ] = library:create( "Frame" , {
@@ -961,7 +960,6 @@ function library:Toggle(options)
             Size = dim2(1, 0, 0, 12);
             BorderColor3 = rgb(0, 0, 0);
             BorderSizePixel = 0;
-            -- AutomaticSize = Enum.AutomaticSize.Y;
             BackgroundColor3 = rgb(255, 255, 255),
             ZIndex = 109
         });
@@ -1347,7 +1345,7 @@ function library:Dropdown(options)
                 BorderSizePixel = 0;
                 AutomaticSize = Enum.AutomaticSize.Y;
                 BackgroundColor3 = rgb(0, 0, 0),
-                ZIndex = 999  -- Очень высокий z-index для выпадающего списка
+                ZIndex = 999
             });
             
             items[ "dropdown_shading" ] = library:create( "Frame" , {
@@ -1411,7 +1409,6 @@ function library:Dropdown(options)
     end
     
     function cfg.set_visible(bool)
-        local a = bool and cfg.y_size or 0
         items[ "dropdown_holder" ].Visible = bool 
         items[ "arrow" ].Rotation = bool and 180 or 0
 
@@ -1507,7 +1504,7 @@ function library:Label(options)
         name = options.Name or options.name or "Label",
 
         -- ignore
-        padding_top = options.PaddingTop or options.padding_top or 0; -- used because roblox cant make proper layouts
+        padding_top = options.PaddingTop or options.padding_top or 0;
         padding_top = options.PaddingBottom or options.padding_bottom or 0;
 
         items = {};
@@ -1573,7 +1570,7 @@ function library:Colorpicker(options)
         -- options
         name = options.name or options.Name or "", 
         flag = options.flag or options.Flag or options.name or options.Name or "please set me a flag 🥺",
-        color = options.color or options.Color or color(1, 1, 1), -- Default to white color if not provided
+        color = options.color or options.Color or color(1, 1, 1),
         alpha = (options.alpha and 1 - options.alpha) or (options.Alpha and 1 - options.Alpha) or 0,
         callback = options.callback or options.Callback or function() end,
 
@@ -2303,8 +2300,6 @@ function library:Keybind(options)
                     Parent = items[ "TextLabel" ]
                 });
                                         
-                -- cfg.y_size += name.AbsoluteSize.Y
-
                 library:create( "UIPadding" , {
                     Parent = name;
                     PaddingTop = dim(0, 1);
@@ -2321,7 +2316,7 @@ function library:Keybind(options)
         -- 
     end 
     
-    function cfg.modify_mode_color(path) -- ts so frikin tuff 💀
+    function cfg.modify_mode_color(path)
         for _,v in cfg.hold_instances do 
             v.TextColor3 = rgb(178, 178, 178)
         end 
@@ -2389,8 +2384,6 @@ function library:Keybind(options)
     end
 
     function cfg.set_visible(bool)
-        -- local size = bool and cfg.y_size or 0
-        -- library:tween(items.object, {Size = dim_offset(items.text_label.AbsoluteSize.X, size)})
         items.modes.Visible = bool 
         items.modes.Position = dim_offset(items.text_label.AbsolutePosition.X + items.text_label.AbsoluteSize.X + 5, items.text_label.AbsolutePosition.Y + 58)
 
@@ -2583,14 +2576,14 @@ function library:list(properties)
         });
     end 
 
-    function cfg.refresh_options(options_to_refresh) -- ignore goofy parameter
+    function cfg.refresh_options(options_to_refresh)
         for _,option in cfg.data_store do 
             option:Destroy()
         end
 
-        for _, option_data in options_to_refresh do -- haha u skids no next >_<
+        for _, option_data in options_to_refresh do
             local button = library:create( "TextButton" , {
-                FontFace = fonts.small;
+                FontFace = library.font;
                 TextColor3 = rgb(0, 0, 0);
                 BorderColor3 = rgb(0, 0, 0);
                 Text = "";
@@ -2770,7 +2763,7 @@ function notifications:create_notification(options)
             LineHeight = 1.75;
             TextColor3 = rgb(255, 255, 255);
             BorderColor3 = rgb(0, 0, 0);
-            Text = cfg.name; -- string.format("[ cht name ] %s", cfg.name);
+            Text = cfg.name;
             AutomaticSize = Enum.AutomaticSize.XY;
             Size = dim2(1, -4, 1, 0);
             Position = dim2(0, 4, 0, -2);
@@ -2842,7 +2835,6 @@ function notifications:create_notification(options)
             notifications:refresh_notifs()
         end)
     else 
-        -- booty code
         task.spawn(function()
             tween_service:Create(line, TweenInfo.new(3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = dim2(1, -1, 0, 1)}):Play()
             task.wait(5)
