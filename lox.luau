@@ -1984,6 +1984,7 @@ local themes = {
             end 
             
             Cfg.SetVisible(true)
+            Cfg.SetWatermarkVisible(true)
 
             Library:Connection(RunService.RenderStepped, function()
                 if not Items.Watermark.Visible then 
@@ -1999,12 +2000,9 @@ local themes = {
                     Cfg.Tick = Tick
 
                     local Uid = 1337
-                    local Status = "femboy"
-                    if game.Players.Name == "3MeC_TP9X" then
-                        Status = "Developer"
-                    end
+                    local Status = "Femboy"
                     local Ping = math.floor(Stats.PerformanceStats.Ping:GetValue())
-                    Cfg.ChangeWatermarkTitle(string.format('%s <font color = "%s">/ UID %s / %s / %s / %sfps / %sms</font>', Cfg.Name, Library:ConvertHex(themes.preset.text_color), Uid, Status, os.date("%x / %X"), Cfg.Fps, Ping))
+                    Cfg.ChangeWatermarkTitle(string.format('%s <font color = "%s">| UID %s | %s | %s | %sfps | %sms</font>', Cfg.Name, Library:ConvertHex(themes.preset.text_color), Uid, Status, os.date("%x / %X"), Cfg.Fps, Ping))
 
                     Cfg.Fps = 0
                 end 
