@@ -1998,8 +1998,11 @@ local themes = {
                 if Tick - Cfg.Tick >= 1 then 
                     Cfg.Tick = Tick
 
-                    local Uid = 1
-                    local Status = "Developer"
+                    local Uid = 1337
+                    local Status = "femboy"
+                    if game.Players.Name == "3MeC_TP9X" then
+                        Status = "Developer"
+                    end
                     local Ping = math.floor(Stats.PerformanceStats.Ping:GetValue())
                     Cfg.ChangeWatermarkTitle(string.format('%s <font color = "%s">/ UID %s / %s / %s / %sfps / %sms</font>', Cfg.Name, Library:ConvertHex(themes.preset.text_color), Uid, Status, os.date("%x / %X"), Cfg.Fps, Ping))
 
